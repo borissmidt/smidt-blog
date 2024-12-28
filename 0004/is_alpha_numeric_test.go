@@ -7,24 +7,25 @@ import (
 	"testing"
 )
 
-type AsciiVector [4]uint64
+type AsciiVector [32]uint8
 
-const mask = 64 - 1
+const mask = 8 - 1
 
 // Set ith bit
 func (bv *AsciiVector) Set(i uint8) {
-	idx := i >> 6
-	bv[idx] |= 1 << (i & mask)
+	idx := i & mask
+	bit := i << 4
+	bv[idx] |= bit
 }
 
 func (bv AsciiVector) Get(i uint8) bool {
-	idx := i >> 6
-	bit := i & (mask)
+	idx := i & mask
+	bit := i >> 4
 	return (bv[idx] & (1 << bit)) != 0
 }
 
-////go:generate go run asm/simd_bitset_asm.go.go -out simd_bitset_asm.go.s
-//func IsSpace(s []byte, bitset *[16]byte) int
+//go:generate go run asm/simd_bitset_asm.go -out simd_bitset_asm.go.s
+//func IsSpace2(s []byte, bitset *[32]byte) uint8
 
 const alphaNumericCharacters = "1234567890abcdefghijklmnopqrtsuvwABCDEFGHIJKLMOPQRTUVWXYZ"
 
@@ -96,6 +97,25 @@ func BenchmarkBranch(b *testing.B) {
 	}
 }
 
+func BenchmarkSwitch(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		for i := 0; i < len(randomBytes); i++ {
+		loop:
+			for i, x := range randomBytes[i:] {
+				switch x {
+				case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+					fallthrough
+				case 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'y', 'z':
+					fallthrough
+				case 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'Y', 'Z':
+					result = i != 0
+					break loop
+				}
+			}
+		}
+	}
+}
+
 func BenchmarkAsciiVector(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for i := 0; i < len(randomBytes); i++ {
@@ -135,3 +155,17 @@ func BenchmarkLookup(b *testing.B) {
 		}
 	}
 }
+
+//func BenchmarkIsSpace(b *testing.B) {
+//	vect := [32]uint8(v)
+//
+//	for i := 0; i < b.N; i++ {
+//		for i := 0; i < len(randomBytes); i++ {
+//			x := IsSpace2(randomBytes[i:], &vect)
+//			if x != 32 {
+//				println(string(randomBytes[i : i+31]))
+//			}
+//
+//		}
+//	}
+//}
